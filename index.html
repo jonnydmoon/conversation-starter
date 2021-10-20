@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width" />
+    <title>Conversation</title>
+
+    <style>
+      html,
+      body,
+      .main {
+        height: 100%;
+        margin: 0;
+        padding: 0;
+        font-family: Helvetica, sans-serif;
+      }
+      .main {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 42px;
+        padding: 25px;
+        box-sizing: border-box;
+        transition: background-color 1s;
+        flex-direction: column;
+        overflow: auto;
+      }
+
+      .playingEnded .main {
+        background-color: #8e1616;
+      }
+
+      .playing .main {
+        border: 10px solid #008000;
+        border-left: none;
+        border-right: none;
+      }
+
+      .menuIcon {
+        position: absolute;
+        top: 5px;
+        right: 5px;
+      }
+
+      .menu,
+      .playAgain {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        overflow: auto;
+
+        display: flex;
+        flex-direction: column;
+        background-color: white;
+      }
+
+      .menu > * {
+        border-bottom: solid 1px #ececec;
+        background: white;
+        padding: 15px;
+      }
+
+      .answer {
+        color: gray;
+      }
+    </style>
+    <script src="https://cdn.jsdelivr.net/lodash/4/lodash.min.js"></script>
+  </head>
+  <body>
+    <div class="menuIcon" onclick="app.showDefaultMenu();">
+      <svg
+        width="24px"
+        height="24px"
+        viewBox="0 0 1792 1792"
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        <path
+          d="M1664 1344v128q0 26-19 45t-45 19h-1408q-26 0-45-19t-19-45v-128q0-26 19-45t45-19h1408q26 0 45 19t19 45zm0-512v128q0 26-19 45t-45 19h-1408q-26 0-45-19t-19-45v-128q0-26 19-45t45-19h1408q26 0 45 19t19 45zm0-512v128q0 26-19 45t-45 19h-1408q-26 0-45-19t-19-45v-128q0-26 19-45t45-19h1408q26 0 45 19t19 45z"
+        />
+      </svg>
+    </div>
+
+    <div class="main" onclick="showNext()"></div>
+    <div class="menu" style="display: none;"></div>
+    <div class="playAgain" style="display: none;">
+      Done.
+    </div>
+
+    <script>
+      const bodyEl = document.querySelector("body");
+      const menuEl = document.querySelector(".menu");
+
+      var app = {};
+      app.maxRows = 0;
+      app.currentRow = -1;
+      app.rows = [];
+      app.playSound = true;
+      app.playGame = false;
+      app.playTime = 50000;
+
+      app.currentColumn = 0;
+
+      var snd = new Audio(
+        "data:audio/wav;base64,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qJrx4KOQjahZxWbcZgztj2c49nKmkId44S71j0c8eV9yDK6uPRzx5X18eDvjvQ6yKo9ZSS6l//8elePK/Lf//IInrOF/FvDoADYAGBMGb7FtErm5MXMlmPAJQVgWta7Zx2go+8xJ0UiCb8LHHdftWyLJE0QIAIsI+UbXu67dZMjmgDGCGl1H+vpF4NSDckSIkk7Vd+sxEhBQMRU8j/12UIRhzSaUdQ+rQU5kGeFxm+hb1oh6pWWmv3uvmReDl0UnvtapVaIzo1jZbf/pD6ElLqSX+rUmOQNpJFa/r+sa4e/pBlAABoAAAAA3CUgShLdGIxsY7AUABPRrgCABdDuQ5GC7DqPQCgbbJUAoRSUj+NIEig0YfyWUho1VBBBA//uQZB4ABZx5zfMakeAAAAmwAAAAF5F3P0w9GtAAACfAAAAAwLhMDmAYWMgVEG1U0FIGCBgXBXAtfMH10000EEEEEECUBYln03TTTdNBDZopopYvrTTdNa325mImNg3TTPV9q3pmY0xoO6bv3r00y+IDGid/9aaaZTGMuj9mpu9Mpio1dXrr5HERTZSmqU36A3CumzN/9Robv/Xx4v9ijkSRSNLQhAWumap82WRSBUqXStV/YcS+XVLnSS+WLDroqArFkMEsAS+eWmrUzrO0oEmE40RlMZ5+ODIkAyKAGUwZ3mVKmcamcJnMW26MRPgUw6j+LkhyHGVGYjSUUKNpuJUQoOIAyDvEyG8S5yfK6dhZc0Tx1KI/gviKL6qvvFs1+bWtaz58uUNnryq6kt5RzOCkPWlVqVX2a/EEBUdU1KrXLf40GoiiFXK///qpoiDXrOgqDR38JB0bw7SoL+ZB9o1RCkQjQ2CBYZKd/+VJxZRRZlqSkKiws0WFxUyCwsKiMy7hUVFhIaCrNQsKkTIsLivwKKigsj8XYlwt/WKi2N4d//uQRCSAAjURNIHpMZBGYiaQPSYyAAABLAAAAAAAACWAAAAApUF/Mg+0aohSIRobBAsMlO//Kk4soosy1JSFRYWaLC4qZBYWFRGZdwqKiwkNBVmoWFSJkWFxX4FFRQWR+LsS4W/rFRb/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////VEFHAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAU291bmRib3kuZGUAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMjAwNGh0dHA6Ly93d3cuc291bmRib3kuZGUAAAAAAAAAACU="
+      );
+
+      function beep() {
+        if (!app.playSound) {
+          return;
+        }
+        snd.play();
+      }
+
+      function nextRowIndex() {
+        app.currentRow++;
+        if (app.currentRow >= app.maxRows) {
+          app.currentRow = 0;
+        }
+        return app.currentRow;
+      }
+
+      function showNext(playSound) {
+        if (
+          app.currentColumn === 0 &&
+          _.get(app, "rows[" + app.currentRow + "][1]", false)
+        ) {
+          document.querySelector(".main").innerHTML =
+            '<div class="answer">Answer:</div><div>' +
+            app.rows[app.currentRow][1] +
+            "</div>";
+          app.currentColumn = 1;
+        } else {
+          app.currentColumn = 0;
+          document.querySelector(".main").innerHTML =
+            app.rows[nextRowIndex()][0];
+        }
+
+        if (playSound) {
+          beep();
+        }
+      }
+
+      var debouncedShowNext = _.debounce(showNext.bind(this, true), 700, {
+        leading: true,
+        trailing: false
+      });
+
+      function getSheets(id) {}
+
+      class Google {
+        constructor(key) {
+          this.key = key;
+        }
+        async getSheets(id) {
+          let result = await fetch(
+            `https://sheets.googleapis.com/v4/spreadsheets/${id}?includeGridData=false&key=${this.key}`
+          ).then((r) => r.json());
+          let sheets = {};
+          result.sheets.forEach(
+            (sheet) => (sheets[sheet.properties.title] = sheet.properties)
+          );
+
+          await Promise.all(
+            result.sheets.map(async (sheet) => {
+              let values = await this.getSheet(id, sheet.properties.title);
+              sheets[sheet.properties.title].values = values;
+            })
+          );
+
+          return sheets;
+        }
+
+        async getSheet(id, sheetName) {
+          let result = await fetch(
+            `https://sheets.googleapis.com/v4/spreadsheets/${id}/values/${sheetName}?key=${this.key}`
+          ).then((r) => r.json());
+          return result.values;
+        }
+      }
+
+      var google = new Google("AIzaSyBVsvOGN8Ze1ecsJbEulU1t9oybxTSvHYo");
+
+      google
+        .getSheets("19a6LIL8aFjgs7em-lW2iA4jXejnEWZlWl4I9lK0GkOw")
+        .then(function (result) {
+          //console.log('getSpreadSheet:', result.General.data.rows);
+          app.sheets = result;
+          app.loadSheet("General");
+        });
+
+      var degrees = 0;
+
+      // For now, don't change with device flicks.
+      // window.addEventListener('devicemotion', deviceMotionHandler, false);
+      // window.addEventListener('deviceorientation', devOrientHandler, false);
+
+      function deviceMotionHandler(eventData) {
+        if (
+          Math.abs(eventData.rotationRate.beta) > 90 &&
+          Math.abs(degrees) < 20
+        ) {
+          debouncedShowNext();
+        }
+      }
+
+      function devOrientHandler(eventData) {
+        degrees = eventData.gamma;
+        //$('.degrees').html(degrees);
+      }
+
+      app.showMenu = function () {
+        document.querySelector(".menu").innerHTML = app.currentItems
+          .map((item, i) => {
+            return `<div onclick="app.menuClick(event, ${i})">${item.label}</div>`;
+          })
+          .join("\n");
+
+        show(menuEl);
+      };
+      app.hideMenu = function () {
+        hide(menuEl);
+      };
+
+      app.loadSheet = function (sheetName) {
+        app.rows = _.shuffle(app.sheets[sheetName].values);
+        app.maxRows = app.rows.length;
+        app.currentColumn = 1;
+        showNext();
+      };
+
+      app.menuClick = function (event, i) {
+        event.stopPropagation();
+        //$('#console').html(JSON.stringify(app.currentItems[i]));
+        app.currentItems[i].onClick();
+      };
+
+      app.showDefaultMenu = function () {
+        app.currentItems = [
+          {
+            label: "Hide Menu",
+            onClick: function () {
+              app.hideMenu();
+            }
+          },
+          app.playGame
+            ? {
+                label: "Stop Game",
+                onClick: function () {
+                  app.stopPlaying();
+                }
+              }
+            : {
+                label: "Play Game",
+                onClick: function () {
+                  app.startPlaying();
+                }
+              },
+          {
+            label: "Change Deck",
+            onClick: function () {
+              app.showDeckMenu();
+            }
+          },
+          {
+            label: app.playSound ? "Turn Sound Off" : "Turn Sound On",
+            onClick: function () {
+              app.playSound = !app.playSound;
+              app.showDefaultMenu();
+            }
+          }
+        ];
+        app.showMenu();
+      };
+
+      app.showDeckMenu = function () {
+        app.currentItems = _.map(app.sheets, function (o) {
+          return {
+            label: o.title,
+            onClick: function () {
+              app.loadSheet(o.title);
+              app.hideMenu();
+            }
+          };
+        });
+
+        app.currentItems.unshift({
+          label: "Main Menu",
+          onClick: function () {
+            app.showDefaultMenu();
+          }
+        });
+
+        app.showMenu();
+      };
+
+      app.startPlaying = function () {
+        bodyEl.classList.add("playing");
+        app.playGame = true;
+        app.playTimeout = _.delay(function () {
+          bodyEl.classList.add("playingEnded");
+          _.delay(function () {
+            bodyEl.classList.remove("playingEnded");
+          }, 5000);
+          app.stopPlaying();
+          snd.play();
+          _.delay(function () {
+            snd.play();
+          }, 300);
+          _.delay(function () {
+            snd.play();
+          }, 600);
+          _.delay(function () {
+            snd.play();
+          }, 900);
+          _.delay(function () {
+            snd.play();
+          }, 1200);
+        }, _.random(app.playTime, app.playTime + 10000));
+
+        app.hideMenu();
+      };
+
+      app.stopPlaying = function () {
+        bodyEl.classList.remove("playing");
+        app.playGame = false;
+        clearTimeout(app.playTimeout);
+      };
+
+      function show(elem) {
+        elem.style.display = "block";
+      }
+
+      function hide(elem) {
+        elem.style.display = "none";
+      }
+    </script>
+  </body>
+</html>
